@@ -17,12 +17,7 @@
  */
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.ArrayIndexOutOfBoundsExecutiveException;
-import gov.nasa.jpf.vm.BooleanArrayFields;
-import gov.nasa.jpf.vm.ByteArrayFields;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Fields;
-import gov.nasa.jpf.vm.StackFrame;
+import gov.nasa.jpf.vm.*;
 
 /**
  * Store into byte or boolean array
@@ -48,8 +43,17 @@ public class BASTORE extends ArrayStoreInstruction {
 
     } else if (f instanceof BooleanArrayFields){
       ei.setBooleanElement(index, value != 0 ? true : false);
-    }
 
+      ClassInfo enclosingClass = getMethodInfo().getClassInfo();
+      if (enclosingClass.hasJacocoCoverageData()) {
+        int probeArrayRef = enclosingClass.getJacocoCoverageDataRef();
+        // Test if we are writing to jacoco probe array (coverage info for this class)
+        if (ei.getObjectRef() == probeArrayRef) {
+          ClassInfo.JacocoClassSignature covSig = enclosingClass.getJacocoSignature();
+          VM.getVM().getJacocoProbeData(covSig.classId, covSig.className, covSig.probeCount)[index] = true;
+        }
+      }
+    }
   }
 
   @Override

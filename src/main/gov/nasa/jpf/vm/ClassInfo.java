@@ -21,6 +21,7 @@ import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.JPFConfigException;
 import gov.nasa.jpf.JPFListener;
+import gov.nasa.jpf.jvm.bytecode.*;
 import gov.nasa.jpf.util.ImmutableList;
 import gov.nasa.jpf.util.JPFLogger;
 import gov.nasa.jpf.util.LocationSpec;
@@ -253,6 +254,8 @@ public class ClassInfo extends InfoObject implements Iterable<MethodInfo>, Gener
 
   // To know if class is loaded from JVM or is JPF class      
   protected boolean isJPFClass = false;
+
+  protected JacocoClassSignature jacocoClassSignature;
 
   static boolean init (Config config) {
 
@@ -561,6 +564,7 @@ public class ClassInfo extends InfoObject implements Iterable<MethodInfo>, Gener
     processJPFConfigAnnotation();
     processJPFAnnotations(this);
     loadAnnotationListeners();    
+    initJacocoClassSignature();
   }
   
   protected ClassInfo(){
@@ -2662,6 +2666,76 @@ public class ClassInfo extends InfoObject implements Iterable<MethodInfo>, Gener
   
   public DirectCallStackFrame createRunStartStackFrame (ThreadInfo ti, MethodInfo miRun){
     return null;
+  }
+
+  public static class JacocoClassSignature {
+    public final long classId;
+    public final String className;
+    public final int probeCount;
+    public JacocoClassSignature(long classId, String className, int probeCount) {
+      this.classId = classId;
+      this.className = className;
+      this.probeCount = probeCount;
+    }
+  }
+
+  public boolean hasJacocoCoverageData() {
+    return getStaticField("$jacocoData") != null;
+  }
+
+  public int getJacocoCoverageDataRef() {
+    return getStaticElementInfo().getReferenceField("$jacocoData");
+  }
+
+  public JacocoClassSignature getJacocoSignature() {
+    return jacocoClassSignature;
+  }
+
+  private void initJacocoClassSignature() {
+    MethodInfo mi = getMethod("$jacocoInit()[Z", false);
+    if (mi == null) {
+      return;
+    }
+    Instruction[] code = mi.getInstructions();
+    long id = -1;
+    String name = null;
+    int numProbe = -1;
+    // First 4 instructions are:
+    //  0: getstatic     #XX // Field $jacocoData:[Z
+    //  3: dup
+    //  4: ifnonnull     XX
+    //  7: pop
+    //  ...
+
+    // Then
+    // get id
+    Instruction loadIdInst = code[4];
+    if(loadIdInst instanceof LDC2_W) {
+      id = ((LDC2_W) loadIdInst).getValue();
+    } else {
+      throw new RuntimeException("Unexpected instruction type to load classId: " + loadIdInst);
+    }
+
+    // get name
+    Instruction loadNameInst = code[5];
+    if (loadNameInst instanceof LDC) {
+      name = ((LDC) loadNameInst).getStringValue();
+    } else {
+      throw new RuntimeException("Unexpected instruction type to load className: " + loadNameInst);
+    }
+
+    // get numProbe
+    Instruction loadNumProbeInst = code[6];
+    if (loadNumProbeInst instanceof ICONST) {
+      numProbe = ((ICONST) loadNumProbeInst).getValue();
+    } else if (loadNumProbeInst instanceof SIPUSH) {
+      numProbe = ((SIPUSH) loadNumProbeInst).getValue();
+    } else if (loadNumProbeInst instanceof BIPUSH) {
+      numProbe = ((BIPUSH) loadNumProbeInst).getValue();
+    } else {
+      throw new RuntimeException("Unexpected instruction type to load numProbe: " + loadNumProbeInst);
+    }
+    jacocoClassSignature = new JacocoClassSignature(id, name, numProbe);
   }
 }
 

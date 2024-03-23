@@ -28,13 +28,12 @@ import gov.nasa.jpf.util.IntTable;
 import gov.nasa.jpf.util.JPFLogger;
 import gov.nasa.jpf.util.Misc;
 import gov.nasa.jpf.util.Predicate;
+import org.jacoco.core.runtime.RuntimeData;
+
 import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 /**
@@ -156,6 +155,8 @@ public abstract class VM {
   // we want a (internal) mechanism that is on-demand only, i.e. processed
   // actions are removed from the list
   protected ArrayList<Runnable> postGcActions = new ArrayList<Runnable>();
+
+  protected RuntimeData jacocoCoverageData;
   
   /**
    * be prepared this might throw JPFConfigExceptions
@@ -213,6 +214,8 @@ public abstract class VM {
         return (ti.isAlive());
       }
     };
+
+    initJacocoCoverageData();
   }
 
   /**
@@ -258,7 +261,28 @@ public abstract class VM {
     Object[] args = { this, config };
     timeModel = config.getEssentialInstance("vm.time.class", TimeModel.class, argTypes, args);
   }
-  
+
+  protected void initJacocoCoverageData() {
+    jacocoCoverageData = new RuntimeData();
+    String host;
+    try {
+      host = InetAddress.getLocalHost().getHostName();
+    } catch (final Exception e) {
+      // Also catch platform specific exceptions (like on Android) to
+      // avoid bailing out here
+      host = "unknownhost";
+    }
+    jacocoCoverageData.setSessionId(host + Integer.toHexString(new Random().nextInt()));
+  }
+
+  public RuntimeData getJacocoCoverageData() {
+    return jacocoCoverageData;
+  }
+
+  public boolean[] getJacocoProbeData(long classId, String className, int probeCount) {
+    return jacocoCoverageData.getExecutionData(classId, className, probeCount).getProbes();
+  }
+
   /**
    * called after the JPF run is finished. Shouldn't be public, but is called by JPF
    */

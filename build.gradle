@@ -29,6 +29,8 @@ repositories {
 dependencies {
     testImplementation 'org.ow2.asm:asm:9.5'
     testImplementation('junit:junit:4.13.1')
+
+    implementation 'org.jacoco:org.jacoco.core:0.8.11'
 }
 
 configurations {

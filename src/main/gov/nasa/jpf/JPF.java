@@ -30,8 +30,13 @@ import gov.nasa.jpf.util.RunRegistry;
 import gov.nasa.jpf.vm.VM;
 import gov.nasa.jpf.vm.NoOutOfMemoryErrorProperty;
 import gov.nasa.jpf.vm.VMListener;
+import org.jacoco.core.data.ExecutionDataWriter;
+import org.jacoco.core.runtime.RuntimeData;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -652,10 +657,23 @@ public class JPF implements Runnable {
 
       } finally {
         status = Status.DONE;
+        dumpJacocoCoverageData();
 
         config.jpfRunTerminated();
         cleanUp();        
       }
+    }
+  }
+
+  private void dumpJacocoCoverageData() {
+    String covFile = config.getString("jacoco.cov_file");
+    RuntimeData coverageData = vm.getJacocoCoverageData();
+    try (FileOutputStream fos = new FileOutputStream(covFile == null ? "jacoco.exec" : covFile);
+         BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+      final ExecutionDataWriter dataWriter = new ExecutionDataWriter(bos);
+      coverageData.collect(dataWriter, dataWriter, false);
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
   
